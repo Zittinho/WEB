@@ -33,10 +33,10 @@ SESSION_COOKIE_AGE = 60 * 15  # 15 минут
 
 INSTALLED_APPS = [
     'users',
-    'django.contrib.sessions',
+    
     'django.contrib.auth',
     'django.contrib.admin',
-    'django.contrib.auth',
+    
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
@@ -96,6 +96,9 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+MIDDLEWARE += [
+    'users.middleware.SimpleLoggerMiddleware',
+]
 
 
 # Password validation
