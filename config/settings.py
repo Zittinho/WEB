@@ -43,6 +43,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[any])
 # ────────────────────────────────────────────────────────────────────────────────
 # APPLICATION DEFINITION
 # ────────────────────────────────────────────────────────────────────────────────
+ASGI_APPLICATION = 'config.asgi.application'
 
 INSTALLED_APPS = [
     # Core Django apps
@@ -52,6 +53,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels'
 
     # Third-party apps
     'corsheaders',            # CORS support
