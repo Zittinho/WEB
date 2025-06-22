@@ -10,44 +10,65 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+import environ
+
+# ────────────────────────────────────────────────────────────────────────────────
+# BASE DIR & ENVIRONMENT
+# ────────────────────────────────────────────────────────────────────────────────
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# initialise environment variables
+env = environ.Env(
+    DEBUG=(bool, False),
+    SECRET_KEY=(str, 'replace-me-in-.env'),
+    DATABASE_URL=(str, f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
+)
+# read .env file
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+# ────────────────────────────────────────────────────────────────────────────────
+# SECURITY
+# ────────────────────────────────────────────────────────────────────────────────
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-@!dswf8p-tg5c3in^m*d3^$-6qwr&pmh&o=j@t3zn+%r5u%w51'
+SECRET_KEY = env('SECRET_KEY')
+DEBUG = env('DEBUG')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Исправленная строка - убраны лишние скобки
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[any])
 
-ALLOWED_HOSTS = []
-
-SESSION_COOKIE_AGE = 60 * 15  # 15 минут
-
-# Application definition
+# ────────────────────────────────────────────────────────────────────────────────
+# APPLICATION DEFINITION
+# ────────────────────────────────────────────────────────────────────────────────
 
 INSTALLED_APPS = [
-    'users',
-    
-    'django.contrib.auth',
+    # Core Django apps
     'django.contrib.admin',
-    
+    'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',          # ← добавляем DRF
-    'drf_yasg',                # ← для Swagger/OpenAPI
-    'todo',                    # ← наше приложение
+
+    # Third-party apps
+    'corsheaders',            # CORS support
+    'rest_framework',         # Django REST Framework
+    'rest_framework.authtoken',
+    'django_filters',         # Filtering in DRF
+    'drf_yasg',               # Swagger / ReDoc
+    'channels',               # WebSockets via Channels
+
+    # Your apps
+    'todo',
+    'users',
+    'shop',
 ]
 
-
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',               # must be high in chain
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -55,6 +76,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    # Custom logging middleware
+    'users.middleware.SimpleLoggerMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -62,7 +86,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [ os.path.join(BASE_DIR, 'templates') ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -74,6 +98,59 @@ TEMPLATES = [
     },
 ]
 
+WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'  # for Channels
+
+# ────────────────────────────────────────────────────────────────────────────────
+# DATABASES
+# ────────────────────────────────────────────────────────────────────────────────
+
+DATABASES = {
+    'default': env.db(),  # parses DATABASE_URL
+}
+
+# ────────────────────────────────────────────────────────────────────────────────
+# AUTHENTICATION & SESSIONS
+# ────────────────────────────────────────────────────────────────────────────────
+
+AUTH_PASSWORD_VALIDATORS = [
+    { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator' },
+    { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator' },
+    { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator' },
+    { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator' },
+]
+
+SESSION_COOKIE_AGE = 60 * 15  # 15 minutes
+
+# ────────────────────────────────────────────────────────────────────────────────
+# INTERNATIONALIZATION
+# ────────────────────────────────────────────────────────────────────────────────
+
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+# ────────────────────────────────────────────────────────────────────────────────
+# STATIC FILES
+# ────────────────────────────────────────────────────────────────────────────────
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# ────────────────────────────────────────────────────────────────────────────────
+# CORS
+# ────────────────────────────────────────────────────────────────────────────────
+
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',  # React dev
+    'http://localhost:5173',  # Vue dev
+]
+
+# ────────────────────────────────────────────────────────────────────────────────
+# DRF CONFIGURATION
+# ────────────────────────────────────────────────────────────────────────────────
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
@@ -81,63 +158,21 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
 }
 
+# ────────────────────────────────────────────────────────────────────────────────
+# CHANNELS (WebSockets)
+# ────────────────────────────────────────────────────────────────────────────────
 
-WSGI_APPLICATION = 'config.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = {
+CHANNEL_LAYERS = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
 }
-MIDDLEWARE += [
-    'users.middleware.SimpleLoggerMiddleware',
-]
-
-
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
-
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
-USE_I18N = True
-
-USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
-STATIC_URL = 'static/'
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
