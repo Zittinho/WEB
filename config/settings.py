@@ -27,10 +27,14 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+SESSION_COOKIE_AGE = 60 * 15  # 15 минут
 
 # Application definition
 
 INSTALLED_APPS = [
+    'users',
+    'django.contrib.sessions',
+    'django.contrib.auth',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
